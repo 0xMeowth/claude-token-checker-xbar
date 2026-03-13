@@ -37,8 +37,39 @@ An [xbar](https://xbarapp.com) / [SwiftBar](https://github.com/swiftbar/SwiftBar
 - Time remaining until the session resets
 - A rate indicator (`▲` above expected pace, `▼` below, `=` on pace)
 
+## File naming
+
+xbar and SwiftBar determine the refresh interval from the filename. The format is `<name>.<interval>.sh`, where the interval uses `s` (seconds), `m` (minutes), or `h` (hours). For example:
+- `claude_tokens.5m.sh` — refresh every 5 minutes
+- `claude_tokens.30s.sh` — refresh every 30 seconds
+
+**Do not set the interval below 5 minutes.** The Anthropic usage API will rate-limit you (HTTP 429). The plugin has a 290-second cache to absorb rapid re-runs, but a short filename interval will quickly exhaust it and you'll start seeing stale data or `Claude: rate limited` in your menu bar.
+
+## Error states
+
+| Menu bar shows | Cause | Fix |
+|---|---|---|
+| `Claude: no auth` | No credentials found in Keychain | Run `claude login` |
+| `Claude: no token` | Credentials exist but OAuth token couldn't be parsed | Run `claude logout && claude login` |
+| `Claude: auth expired` | API returned 401 — token expired | Run `claude logout && claude login` |
+| `Claude: rate limited` | API returned 429 and no cached data is available | Wait and refresh, or increase the filename interval |
+| `Claude: API error` | Any other non-200 response and no cached data | Check `~/.cache/claude-usage/plugin.log` |
+
+## Caching
+
+The plugin caches the last successful API response at `~/.cache/claude-usage/usage.json` with a 290-second TTL (just under the 5-minute refresh interval).
+
+**Why:** xbar re-runs the plugin script on every menu bar click and on each refresh cycle. Without a cache, each interaction would hit the API, increasing the chance of hitting rate limits. The cache means only one live API call is made per refresh cycle; rapid re-runs within the window use cached data.
+
+**Behaviour on errors:**
+- **429 (rate limited):** falls back to stale cache if one exists; shows `Claude: rate limited` only if there's no cache at all.
+- **401 (auth expired):** intentionally ignores the cache — stale data would be misleading, and you need to re-login anyway.
+- **Other errors:** falls back to stale cache if one exists.
+- **Error responses in cache:** if the cached file itself contains an API error body, the cache is skipped and a fresh call is made.
+
+A log is kept at `~/.cache/claude-usage/plugin.log` and is automatically trimmed to 500 lines once it exceeds 1000.
+
 ## Notes
 
 - Only tested on macOS with xbar. SwiftBar should work but is untested.
 - Credentials are read from the macOS Keychain (written there by `claude login`) — no API key setup required.
-- Usage data is cached for ~5 minutes to avoid hammering the API on rapid re-runs.
