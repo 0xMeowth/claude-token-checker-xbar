@@ -33,9 +33,8 @@ An [xbar](https://xbarapp.com) / [SwiftBar](https://github.com/swiftbar/SwiftBar
 
 ## What it shows
 
-- Current 5-hour session usage percentage
-- Time remaining until the session resets
-- A rate indicator (`▲` above expected pace, `▼` below, `=` on pace)
+- **Menu bar:** 5-hour session usage %, time to reset, and rate indicator (`▲` above expected pace, `▼` below, `=` on pace)
+- **Dropdown:** 7-day usage % with run-rate indicator and delta vs linear pace, data source, and last-checked time
 
 ## File naming
 
