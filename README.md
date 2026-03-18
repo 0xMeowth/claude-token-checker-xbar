@@ -69,6 +69,38 @@ The plugin caches the last successful API response at `~/.cache/claude-usage/usa
 
 A log is kept at `~/.cache/claude-usage/plugin.log` and is automatically trimmed to 500 lines once it exceeds 1000.
 
+## API response shape
+
+The plugin calls `GET https://api.anthropic.com/api/oauth/usage` (requires `anthropic-beta: oauth-2025-04-20` header). Sampled response:
+
+```json
+{
+  "five_hour": {
+    "utilization": 2.0,
+    "resets_at": "2026-03-18T12:00:01.099270+00:00"
+  },
+  "seven_day": {
+    "utilization": 0.0,
+    "resets_at": "2026-03-25T07:00:01.099297+00:00"
+  },
+  "seven_day_oauth_apps": null,
+  "seven_day_opus": null,
+  "seven_day_sonnet": null,
+  "seven_day_cowork": null,
+  "iguana_necktie": null,
+  "extra_usage": {
+    "is_enabled": false,
+    "monthly_limit": null,
+    "used_credits": null,
+    "utilization": null
+  }
+}
+```
+
+- `utilization` is a percentage (0–100).
+- `resets_at` is an ISO 8601 timestamp with UTC offset.
+- The `seven_day_*` and `iguana_necktie` fields appear to be per-model or per-app breakdowns; currently `null` in all observed responses.
+
 ## Notes
 
 - Only tested on macOS with xbar. SwiftBar should work but is untested.

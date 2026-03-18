@@ -111,13 +111,14 @@ unset TOKEN
 DATA=$(cat "$CACHE_FILE")
 
 # ── Parse ─────────────────────────────────────────────────────
-IFS='|' read -r FIVE_PCT FIVE_LEFT FIVE_RESET_AT RATE_SYMBOL < <(
+IFS='|' read -r FIVE_PCT FIVE_LEFT FIVE_RESET_AT RATE_SYMBOL WEEK_PCT WEEK_SYMBOL WEEK_DELTA < <(
   printf '%s' "$DATA" | python3 -c "
 import sys, json
 from datetime import datetime, timezone
 
 d = json.load(sys.stdin)
 fh = d.get('five_hour') or {}
+wk = d.get('seven_day') or {}
 
 def time_left(resets_at, utilization=None):
     if not resets_at:
@@ -133,35 +134,40 @@ def time_left(resets_at, utilization=None):
     m = rem // 60
     return f'{h}h{m:02d}m', local_str
 
-five_pct = fh.get('utilization') or 0
-five_left, five_at = time_left(fh.get('resets_at'), fh.get('utilization'))
-
-fh_resets_at = fh.get('resets_at')
-if fh_resets_at:
-    reset_time = datetime.fromisoformat(fh_resets_at.replace('Z', '+00:00'))
+def rate_symbol_and_delta(resets_at, pct, window_secs):
+    if not resets_at:
+        return '=', 0
+    reset_time = datetime.fromisoformat(resets_at.replace('Z', '+00:00'))
     secs_left = max(0, int((reset_time - datetime.now(timezone.utc)).total_seconds()))
-    session_total = 5 * 3600
-    secs_elapsed = session_total - secs_left
-    expected_pct = (secs_elapsed / session_total) * 100
-    delta = int(five_pct) - expected_pct
+    secs_elapsed = window_secs - secs_left
+    expected_pct = (secs_elapsed / window_secs) * 100
+    delta = round(pct - expected_pct)
     if delta > 5:
         symbol = '▲'
     elif delta < -5:
         symbol = '▼'
     else:
         symbol = '='
-else:
-    symbol = '='
+    return symbol, delta
 
-print(f'{int(five_pct)}|{five_left}|{five_at}|{symbol}')
+five_pct = fh.get('utilization') or 0
+five_left, five_at = time_left(fh.get('resets_at'), fh.get('utilization'))
+five_symbol, _ = rate_symbol_and_delta(fh.get('resets_at'), five_pct, 5 * 3600)
+
+week_pct = wk.get('utilization') or 0
+week_symbol, week_delta = rate_symbol_and_delta(wk.get('resets_at'), week_pct, 7 * 24 * 3600)
+week_delta_str = f'+{week_delta}%' if week_delta >= 0 else f'{week_delta}%'
+
+print(f'{int(five_pct)}|{five_left}|{five_at}|{five_symbol}|{int(week_pct)}|{week_symbol}|{week_delta_str}')
 "
 )
 
-log "INFO" "5h: ${FIVE_PCT}% used, resets in ${FIVE_LEFT} (at ${FIVE_RESET_AT}) | source: $FETCH_STATUS"
+log "INFO" "5h: ${FIVE_PCT}% used, resets in ${FIVE_LEFT} (at ${FIVE_RESET_AT}) | 7d: ${WEEK_PCT}% ${WEEK_SYMBOL} (${WEEK_DELTA} vs pace) | source: $FETCH_STATUS"
 
 # ── Output ────────────────────────────────────────────────────
-# Menu bar title: usage % and countdown to reset
 echo "Claude: ${FIVE_PCT}% (${FIVE_LEFT}) ${RATE_SYMBOL}"
+echo "---"
+echo "7-day: ${WEEK_PCT}% ${WEEK_SYMBOL} (${WEEK_DELTA} vs pace)"
 echo "---"
 echo "Source: ${FETCH_STATUS}"
 echo "Last checked: $(date '+%H:%M:%S')"
